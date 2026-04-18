@@ -1,0 +1,27 @@
+# Flutter / Dart / IDE
+.dart_tool/
+.packages
+.pub/
+build/
+coverage/
+
+# Flutter generated
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# iOS / Xcode
+**/Pods/
+**/.symlinks/
+**/Flutter/Flutter.framework
+**/Flutter/Flutter.podspec
+**/Flutter/ephemeral/
+
+# Android
+**/android/.gradle/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
