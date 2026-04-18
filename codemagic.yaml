@@ -1,83 +1,39 @@
 workflows:
-  ios_quickstart:
-    name: iOS Quick Start
+  flutter_ios_no_codesign:
+    name: Flutter iOS (no code signing)
     max_build_duration: 60
     instance_type: mac_mini_m2
+
     environment:
+      flutter: stable
       xcode: latest
-      cocoapods: default
+
     scripts:
-      - name: Detect iOS project files
+      - name: Flutter doctor
+        script: |
+          flutter --version
+          flutter doctor -v
+
+      - name: Ensure full Flutter project structure (generate iOS if missing)
         script: |
           set -euo pipefail
-          if ls *.xcworkspace >/dev/null 2>&1 || ls *.xcodeproj >/dev/null 2>&1; then
-            echo "Found Xcode project/workspace in repository root."
-            echo "SKIP_IOS_BUILD=false" >> "$CM_ENV"
+          if [ ! -d "ios" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
+            echo "Missing iOS project files. Generating with flutter create..."
+            flutter create . --platforms=ios --project-name grandwolf_apple --org com.grandwolf
           else
-            echo "No .xcworkspace/.xcodeproj found in repository root."
-            echo "Skipping iOS build steps for this run."
-            echo "SKIP_IOS_BUILD=true" >> "$CM_ENV"
+            echo "iOS project files already exist."
           fi
 
-      - name: Install CocoaPods dependencies (if Podfile exists)
+      - name: Install dependencies
         script: |
-          set -euo pipefail
-          if [ "${SKIP_IOS_BUILD:-false}" = "true" ]; then
-            echo "SKIP_IOS_BUILD=true -> skipping pod install."
-            exit 0
-          fi
+          flutter pub get
 
-          if [ -f "Podfile" ]; then
-            pod install
-          else
-            echo "No Podfile found. Skipping pod install."
-          fi
-
-      - name: Build iOS app
+      - name: Build iOS (unsigned)
         script: |
-          set -euo pipefail
-          if [ "${SKIP_IOS_BUILD:-false}" = "true" ]; then
-            echo "SKIP_IOS_BUILD=true -> skipping xcodebuild."
-            exit 0
-          fi
-
-          if ls *.xcworkspace >/dev/null 2>&1; then
-            WORKSPACE=$(ls *.xcworkspace | head -1)
-            SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" | awk '/Schemes:/ {getline; print $1; exit}')
-            if [ -z "$SCHEME" ]; then
-              echo "Could not detect a scheme in workspace: $WORKSPACE"
-              exit 1
-            fi
-
-            xcodebuild \
-              -workspace "$WORKSPACE" \
-              -scheme "$SCHEME" \
-              -configuration Debug \
-              -sdk iphonesimulator \
-              -destination 'platform=iOS Simulator,name=iPhone 15' \
-              build
-          elif ls *.xcodeproj >/dev/null 2>&1; then
-            PROJECT=$(ls *.xcodeproj | head -1)
-            SCHEME=$(xcodebuild -list -project "$PROJECT" | awk '/Schemes:/ {getline; print $1; exit}')
-            if [ -z "$SCHEME" ]; then
-              echo "Could not detect a scheme in project: $PROJECT"
-              exit 1
-            fi
-
-            xcodebuild \
-              -project "$PROJECT" \
-              -scheme "$SCHEME" \
-              -configuration Debug \
-              -sdk iphonesimulator \
-              -destination 'platform=iOS Simulator,name=iPhone 15' \
-              build
-          else
-            echo "No Xcode project found to build."
-            exit 1
-          fi
+          flutter build ios --release --no-codesign
 
     artifacts:
-      - build/ios/ipa/*.ipa
+      - build/ios/iphoneos/*.app
       - /tmp/xcodebuild_logs/*.log
 
     publishing:
