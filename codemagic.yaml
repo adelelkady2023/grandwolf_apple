@@ -1,161 +1,58 @@
 workflows:
-  flutter_ios_no_codesign:
-    name: Flutter iOS (no code signing)
+  ios_signed_ipa:
+    name: iOS Signed IPA (Flutter)
     max_build_duration: 60
     instance_type: mac_mini_m2
 
     environment:
       flutter: stable
       xcode: latest
-
-    scripts:
-      - name: Flutter doctor
-        script: |
-          flutter --version
-          flutter doctor -v
-
-      - name: Ensure full Flutter project structure (generate iOS if missing)
-        script: |
-          set -euo pipefail
-          if [ ! -d "ios" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
-            echo "Missing iOS project files. Generating with flutter create..."
-            flutter create . --platforms=ios --project-name grandwolf_apple --org com.grandwolf
-          else
-            echo "iOS project files already exist."
-          fi
-
-      - name: Install dependencies
-        script: |
-          flutter pub get
-
-      - name: Build iOS (unsigned)
-        script: |
-          flutter build ios --release --no-codesign
-
-    artifacts:
-      - build/ios/iphoneos/*.app
-      - /tmp/xcodebuild_logs/*.log
-
-  flutter_ios_preview_online:
-    name: Flutter iOS Online Preview (Appetize)
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-
-    environment:
-      flutter: stable
-      xcode: latest
-
-    scripts:
-      - name: Flutter doctor
-        script: |
-          flutter --version
-          flutter doctor -v
-
-      - name: Ensure iOS platform exists
-        script: |
-          set -euo pipefail
-          if [ ! -d "ios" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
-            flutter create . --platforms=ios --project-name grandwolf_apple --org com.grandwolf
-          fi
-
-      - name: Install dependencies
-        script: |
-          flutter pub get
-
-      - name: Build iOS simulator app (no signing required)
-        script: |
-          flutter build ios --simulator --debug --no-codesign
-
-      - name: Package simulator app
-        script: |
-          set -euo pipefail
-          APP_PATH="build/ios/iphonesimulator/Runner.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "Simulator app not found at $APP_PATH"
-            exit 1
-          fi
-          cd build/ios/iphonesimulator
-          zip -r Runner-simulator.zip Runner.app
-
-      - name: Upload to Appetize (optional)
-        script: |
-          set -euo pipefail
-          if [ -z "${APPETIZE_API_TOKEN:-}" ]; then
-            echo "APPETIZE_API_TOKEN not set. Skipping upload."
-            echo "Download Runner-simulator.zip from artifacts and upload manually to appetize.io"
-            exit 0
-          fi
-
-          curl -H "Authorization: Bearer $APPETIZE_API_TOKEN" \
-            -F "file=@build/ios/iphonesimulator/Runner-simulator.zip" \
-            https://api.appetize.io/v1/apps
-
-    artifacts:
-      - build/ios/iphonesimulator/Runner-simulator.zip
-      - /tmp/xcodebuild_logs/*.log
-
-    publishing:
-      email:
-        recipients:
-          - a.a.kady@gmail.com
-        notify:
-          success: true
-          failure: true
-
-  flutter_web_online_preview:
-    name: Flutter Web Online Preview
-    max_build_duration: 30
-    instance_type: mac_mini_m2
-
-    environment:
-      flutter: stable
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.grandwolf.app
       vars:
-        NETLIFY_DEPLOY_MESSAGE: "Codemagic web preview"
+        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+
+      integrations:
+        app_store_connect: codemagic
 
     scripts:
-      - name: Flutter doctor
-        script: |
-          flutter --version
-          flutter doctor -v
-
-      - name: Ensure web platform exists
+      - name: Ensure iOS project exists
         script: |
           set -euo pipefail
-          if [ ! -d "web" ]; then
-            echo "Missing web folder. Generating with flutter create..."
-            flutter create . --platforms=web --project-name grandwolf_apple --org com.grandwolf
+          if [ ! -d "ios" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
+            flutter create . --platforms=ios --project-name grandwolf_apple --org com.grandwolf
           fi
 
-      - name: Install dependencies
+      - name: Install Flutter dependencies
         script: |
           flutter pub get
 
-      - name: Build web preview
+      - name: Clean Flutter build
         script: |
-          flutter config --enable-web
-          flutter build web --release
+          flutter clean
 
-      - name: Deploy to Netlify (optional but recommended)
+      - name: Set up automatic code signing
         script: |
-          set -euo pipefail
-          if [ -z "${NETLIFY_AUTH_TOKEN:-}" ] || [ -z "${NETLIFY_SITE_ID:-}" ]; then
-            echo "NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID not set."
-            echo "Skipping online deployment. Artifacts will still be available for download."
-            exit 0
-          fi
+          xcode-project use-profiles
 
-          npm install -g netlify-cli
-          netlify deploy \
-            --dir=build/web \
-            --prod \
-            --site "$NETLIFY_SITE_ID" \
-            --auth "$NETLIFY_AUTH_TOKEN" \
-            --message "$NETLIFY_DEPLOY_MESSAGE"
+      - name: Build signed IPA
+        script: |
+          flutter build ipa \
+            --release \
+            --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
-      - build/web/**
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
 
     publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
       email:
         recipients:
           - a.a.kady@gmail.com
