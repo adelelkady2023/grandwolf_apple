@@ -36,6 +36,32 @@ workflows:
       - build/ios/iphoneos/*.app
       - /tmp/xcodebuild_logs/*.log
 
+  flutter_web_preview:
+    name: Flutter Web Preview
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+
+    scripts:
+      - name: Flutter doctor
+        script: |
+          flutter --version
+          flutter doctor -v
+
+      - name: Install dependencies
+        script: |
+          flutter pub get
+
+      - name: Build web preview
+        script: |
+          flutter config --enable-web
+          flutter build web --release
+
+    artifacts:
+      - build/web/**
+
     publishing:
       email:
         recipients:
