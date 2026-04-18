@@ -1,0 +1,61 @@
+workflows:
+  ios_signed_ipa:
+    name: iOS Signed IPA (Flutter)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.grandwolf.app
+      vars:
+        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+
+      integrations:
+        app_store_connect: codemagic
+
+    scripts:
+      - name: Ensure iOS project exists
+        script: |
+          set -euo pipefail
+          if [ ! -d "ios" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
+            flutter create . --platforms=ios --project-name grandwolf_apple --org com.grandwolf
+          fi
+
+      - name: Install Flutter dependencies
+        script: |
+          flutter pub get
+
+      - name: Clean Flutter build
+        script: |
+          flutter clean
+
+      - name: Set up automatic code signing
+        script: |
+          xcode-project use-profiles
+
+      - name: Build signed IPA
+        script: |
+          flutter build ipa \
+            --release \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+      email:
+        recipients:
+          - a.a.kady@gmail.com
+        notify:
+          success: true
+          failure: true
