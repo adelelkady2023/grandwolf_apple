@@ -36,19 +36,29 @@ workflows:
       - build/ios/iphoneos/*.app
       - /tmp/xcodebuild_logs/*.log
 
-  flutter_web_preview:
-    name: Flutter Web Preview
+  flutter_web_online_preview:
+    name: Flutter Web Online Preview
     max_build_duration: 30
     instance_type: mac_mini_m2
 
     environment:
       flutter: stable
+      vars:
+        NETLIFY_DEPLOY_MESSAGE: "Codemagic web preview"
 
     scripts:
       - name: Flutter doctor
         script: |
           flutter --version
           flutter doctor -v
+
+      - name: Ensure web platform exists
+        script: |
+          set -euo pipefail
+          if [ ! -d "web" ]; then
+            echo "Missing web folder. Generating with flutter create..."
+            flutter create . --platforms=web --project-name grandwolf_apple --org com.grandwolf
+          fi
 
       - name: Install dependencies
         script: |
@@ -58,6 +68,23 @@ workflows:
         script: |
           flutter config --enable-web
           flutter build web --release
+
+      - name: Deploy to Netlify (optional but recommended)
+        script: |
+          set -euo pipefail
+          if [ -z "${NETLIFY_AUTH_TOKEN:-}" ] || [ -z "${NETLIFY_SITE_ID:-}" ]; then
+            echo "NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID not set."
+            echo "Skipping online deployment. Artifacts will still be available for download."
+            exit 0
+          fi
+
+          npm install -g netlify-cli
+          netlify deploy \
+            --dir=build/web \
+            --prod \
+            --site "$NETLIFY_SITE_ID" \
+            --auth "$NETLIFY_AUTH_TOKEN" \
+            --message "$NETLIFY_DEPLOY_MESSAGE"
 
     artifacts:
       - build/web/**
