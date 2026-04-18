@@ -36,6 +36,72 @@ workflows:
       - build/ios/iphoneos/*.app
       - /tmp/xcodebuild_logs/*.log
 
+  flutter_ios_preview_online:
+    name: Flutter iOS Online Preview (Appetize)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      xcode: latest
+
+    scripts:
+      - name: Flutter doctor
+        script: |
+          flutter --version
+          flutter doctor -v
+
+      - name: Ensure iOS platform exists
+        script: |
+          set -euo pipefail
+          if [ ! -d "ios" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
+            flutter create . --platforms=ios --project-name grandwolf_apple --org com.grandwolf
+          fi
+
+      - name: Install dependencies
+        script: |
+          flutter pub get
+
+      - name: Build iOS simulator app (no signing required)
+        script: |
+          flutter build ios --simulator --debug --no-codesign
+
+      - name: Package simulator app
+        script: |
+          set -euo pipefail
+          APP_PATH="build/ios/iphonesimulator/Runner.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Simulator app not found at $APP_PATH"
+            exit 1
+          fi
+          cd build/ios/iphonesimulator
+          zip -r Runner-simulator.zip Runner.app
+
+      - name: Upload to Appetize (optional)
+        script: |
+          set -euo pipefail
+          if [ -z "${APPETIZE_API_TOKEN:-}" ]; then
+            echo "APPETIZE_API_TOKEN not set. Skipping upload."
+            echo "Download Runner-simulator.zip from artifacts and upload manually to appetize.io"
+            exit 0
+          fi
+
+          curl -H "Authorization: Bearer $APPETIZE_API_TOKEN" \
+            -F "file=@build/ios/iphonesimulator/Runner-simulator.zip" \
+            https://api.appetize.io/v1/apps
+
+    artifacts:
+      - build/ios/iphonesimulator/Runner-simulator.zip
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - a.a.kady@gmail.com
+        notify:
+          success: true
+          failure: true
+
   flutter_web_online_preview:
     name: Flutter Web Online Preview
     max_build_duration: 30

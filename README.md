@@ -2,7 +2,25 @@
 
 This repository is a Flutter project prepared for Codemagic cloud builds.
 
-## Online preview (recommended)
+## How to view the iOS app (without a Mac)
+
+Use workflow **`flutter_ios_preview_online`** in Codemagic.
+
+### Option A (recommended): Browser iOS preview with Appetize
+1. Create an account at https://appetize.io.
+2. Add `APPETIZE_API_TOKEN` in Codemagic environment variables (secure).
+3. Run workflow `flutter_ios_preview_online`.
+4. Codemagic will build an iOS simulator app (`Runner-simulator.zip`) and upload it to Appetize.
+5. Open the Appetize link to interact with your iOS app in browser.
+
+### Option B: Manual upload to Appetize
+1. Run workflow `flutter_ios_preview_online`.
+2. Download artifact `build/ios/iphonesimulator/Runner-simulator.zip`.
+3. Upload zip manually to Appetize and open generated preview link.
+
+> Note: `flutter_ios_no_codesign` is for unsigned device build and is not directly installable on iPhone.
+
+## Online web preview
 
 Use Codemagic workflow **`flutter_web_online_preview`** to build web and optionally deploy online.
 
